@@ -1,0 +1,44 @@
+# Define the output file path
+$outputFile = "SystemInfo.txt"
+
+# Get the current date and time
+$currentTime = Get-Date
+
+# Function to query and save system information
+function QueryAndSaveSystemInfo {
+    param (
+        [string]$serverRole
+    )
+
+    $systemInfo = @{
+        "Date" = $currentTime
+        "ServerRole" = $serverRole
+    }
+
+    # Check if the server exists and gather information
+    if (Test-Connection -ComputerName $serverRole -Count 1 -Quiet) {
+        $systemInfo["Processes"] = Get-Process | Select-Object Name
+        $systemInfo["UserEnvironmentVariables"] = [System.Environment]::GetEnvironmentVariables("User")
+        $systemInfo["SystemEnvironmentVariables"] = [System.Environment]::GetEnvironmentVariables("Machine")
+        $systemInfo["Processor"] = Get-WmiObject Win32_Processor
+        $systemInfo["ComputerSystem"] = Get-WmiObject Win32_ComputerSystem
+        $systemInfo["LogicalDisks"] = Get-WmiObject Win32_LogicalDisk | Select-Object DeviceID, Size, FreeSpace
+        $systemInfo["Shares"] = Get-WmiObject Win32_Share
+        $systemInfo["NetworkAdapter"] = Get-WmiObject Win32_NetworkAdapterConfiguration
+    } else {
+        Write-Host "Server $serverRole does not exist."
+    }
+
+    # Save the information to the output file
+    $systemInfo | Out-File -Append -FilePath $outputFile
+}
+
+# List of server roles to query
+$serverRoles = @("All", "Controllers", "Members", "Clients")
+
+# Query and save information for each server role
+foreach ($role in $serverRoles) {
+    QueryAndSaveSystemInfo -serverRole $role
+}
+
+Write-Host "System information saved to $outputFile"
